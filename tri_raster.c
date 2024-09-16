@@ -12,6 +12,8 @@ float trig_table[TABLE_SIZE + 1];
 float fov = 90;
 float fovtan;
 
+// yes indeed
+
 t_triangle2 order_points(t_triangle2 tri)
 {
     t_vec2 temp;
