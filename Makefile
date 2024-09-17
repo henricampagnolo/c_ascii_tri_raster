@@ -11,7 +11,7 @@ OBJDIR = ./src
 OBJFILES = $(SRCFILES:%.c=$(OBJDIR)/%.o)
 
 # Default target
-all: $(NAME)
+all: $(OBJDIR) $(NAME)
 
 # Link object files to create the final executable
 $(NAME): $(OBJFILES)
@@ -21,12 +21,16 @@ $(NAME): $(OBJFILES)
 $(OBJDIR)/%.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
+$(OBJDIR):
+	mkdir $(OBJDIR)
+
 # Clean up generated files
 clean:
 	rm -f $(OBJFILES)
 
 fclean: clean
 	rm -f $(NAME)
+	rm -r $(OBJDIR)
 
 # Rebuild everything from scratch
 re: fclean all
