@@ -1,13 +1,33 @@
-CC = cc -Werror -Wall -Wextra
+# Compiler and flags
+CC = cc
+CFLAGS = -Werror -Wall -Wextra
+
+# Executable name
 NAME = triras
+
+# Source and object files
 SRCFILES = tri_raster.c common_func.c
-OBJS = ./src
-OBJFILES = $(OBJS)/$(SRCFILES).c=.o
+OBJDIR = ./src
+OBJFILES = $(SRCFILES:%.c=$(OBJDIR)/%.o)
 
-all : $(NAME)
+# Default target
+all: $(NAME)
 
-$(NAME) : $(OBJFILES)
+# Link object files to create the final executable
+$(NAME): $(OBJFILES)
 	$(CC) $(OBJFILES) -o $(NAME)
 
-$(OBJS)/%.o : %.c
-	$(CC) -c -o $@ $< 
+# Compile source files into object files
+$(OBJDIR)/%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+# Clean up generated files
+clean:
+	rm -f $(OBJFILES)
+
+fclean: clean
+	rm -f $(NAME)
+
+# Rebuild everything from scratch
+re: fclean all
+

@@ -1,7 +1,7 @@
 #include "tri_raster.h"
 
 #define WIDTH 80
-#define HEIGHT 44
+#define HEIGHT 40
 
 float A, B, C;
 
@@ -86,7 +86,7 @@ float max2(float a, float b)
     return b;
 }
 
-void draw_tri(t_triangle3 tri)
+void draw_tri(t_triangle3 tri, char symbol)
 {
     t_triangle2 proj_tri;
     t_linear funcs[3];
@@ -99,25 +99,29 @@ void draw_tri(t_triangle3 tri)
     get_funcs (funcs, proj_tri);
     if (funcs[0].a * pmid.x + funcs[0].b < pmid.y)
     {
-        for (int x = pstart.x; x < pend.x; x++)
+        for (int x = max2(pstart.x, 0); x < min2(pend.x, WIDTH - 1); x++)
         {
-            for (int y = funcs[0].a * x + funcs[0].b; y < min2(funcs[1].a * x + funcs[1].b, funcs[2].a * x + funcs[2].b); y++)
+            for (int y = max2(funcs[0].a * x + funcs[0].b, 0);
+				y < min2(min2(funcs[1].a * x + funcs[1].b, funcs[2].a * x + funcs[2].b), HEIGHT - 1);
+				y++)
             {
                 //printf("x is: %d, y is: %d\n", x, y);
                 if ((x >= 0 && x < WIDTH) && (y >= 0 && y < HEIGHT))
-                    buffer[(HEIGHT - y) *  WIDTH + x] = 'Z';
+                    buffer[(HEIGHT - y) *  WIDTH + x] = symbol;
             }
         }
     }
     else
     {
-        for (int x = pstart.x; x < pend.x; x++)
+        for (int x = max2(pstart.x, 0); x < min2(pend.x, WIDTH - 1); x++)
         {
-            for (int y = funcs[0].a * x + funcs[0].b; y > max2(funcs[1].a * x + funcs[1].b, funcs[2].a * x + funcs[2].b); y--)
-            {
+            for (int y = min2(funcs[0].a * x + funcs[0].b, HEIGHT - 1);
+				y > max2(max2(funcs[1].a * x + funcs[1].b, funcs[2].a * x + funcs[2].b), 0);
+				y--)
+			{
                 //printf("x is: %d, y is: %d\n", x, y);
                 if ((x >= 0 && x < WIDTH) && (y >= 0 && y < HEIGHT))
-                    buffer[(HEIGHT - y) * WIDTH + x] = 'Z';
+                    buffer[(HEIGHT - y) * WIDTH + x] = symbol;
             }
         }
     }
@@ -156,37 +160,57 @@ void rotate_point_z(t_vec3 *p_p, float rad)
 int main(void)
 {
     float z;
+	float alpha;
     create_sin_table(trig_table);
     fovtan = (get_cos(fov / 360 * PI, trig_table) / get_sin(fov / 360 * PI, trig_table));
 
-    t_triangle3 tri;
-    t_triangle3 tri_cpy;
-    tri.points[0].x = -10, tri.points[0].y = 0, tri.points[0].z = 80;
-    tri.points[1].x = 10, tri.points[1].y = 0, tri.points[1].z = 80;
-    tri.points[2].x = 0, tri.points[2].y = 70, tri.points[2].z = 80;
+    t_triangle3 tri1;
+    t_triangle3 tri1_cpy;
+    tri1.points[0].x = -30, tri1.points[0].y = -50, tri1.points[0].z = 70;
+    tri1.points[1].x = 50, tri1.points[1].y = 0, tri1.points[1].z = 70;
+    tri1.points[2].x = 0, tri1.points[2].y = 70, tri1.points[2].z = 70;
+
+	t_triangle3 tri2;
+    t_triangle3 tri2_cpy;
+    tri2.points[0].x = -20, tri2.points[0].y = 0, tri2.points[0].z = 80;
+    tri2.points[1].x = 50, tri2.points[1].y = 0, tri2.points[1].z = 80;
+    tri2.points[2].x = 0, tri2.points[2].y = -70, tri2.points[2].z = 80;
+
     printf("\x1b[2J");
 
     z = 0;
-    while (1)
+	alpha = 0;
+    while (z == 0)
     {
-        tri_cpy = tri;
-        rotate_point_z(tri_cpy.points, z);
-        rotate_point_z(tri_cpy.points + 1, z);
-        rotate_point_z(tri_cpy.points + 2, z);
+        z += 0.2;
+
+        tri1_cpy = tri1;
+        rotate_point_z(tri1_cpy.points, alpha);
+        rotate_point_z(tri1_cpy.points + 1, alpha);
+        rotate_point_z(tri1_cpy.points + 2, alpha);
+
+		tri2_cpy = tri2;
+        rotate_point_x(tri2_cpy.points, z);
+        rotate_point_x(tri2_cpy.points + 1, z);
+        rotate_point_x(tri2_cpy.points + 2, z);
 
         memset(buffer, backgroundASCIICode, WIDTH * HEIGHT);
         memset(zBuffer, 0, WIDTH * HEIGHT * 4);
 
-        draw_tri(tri_cpy);
+        draw_tri(tri1_cpy, 'A');
+		draw_tri(tri2_cpy, '/');
 
         printf("\x1b[H");
         for (int k = 0; k < WIDTH * HEIGHT; k++) 
         {
             putchar(k % WIDTH ? buffer[k] : 10);
+			//putchar(k % WIDTH ? ' ' : '\t');
         }
-        if (z >= PI * 2)
+		/*
+		if (z >= PI * 2)
             z = 0;
-        z += 0.002;
-        printf("z is: %f,  sin of z: %f, cos of z: %f", z, get_sin(z, trig_table), get_cos(z, trig_table));
+        z += 0.2;
+		*/
+        printf("\nz is: %f,  sin of z: %f, cos of z: %f", z, get_sin(z, trig_table), get_cos(z, trig_table));
     }
 }
