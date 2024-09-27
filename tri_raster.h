@@ -62,7 +62,16 @@ typedef struct s_triangle2
 
 typedef struct s_triangle3
 {
-    t_vec3  points[3];
+    t_vec3 *points[3];
 }   t_triangle3;
+
+typedef struct s_shape
+{
+    int size;
+    t_vec3 center;
+    char *texture;
+    t_vec3 *points;
+    t_triangle3 *tris;
+}   t_shape;
 
 #endif
