@@ -101,6 +101,16 @@ float max2(float a, float b)
     return b;
 }
 
+float map_to_range(float x, float min, float max)
+{
+	return min2(max2(x, min), max);
+}
+
+int round_up(float n)
+{
+	return (int)n + 1;
+}
+
 void draw_tri(t_triangle3 tri, char symbol)
 {
     t_triangle3 proj_tri;
@@ -124,7 +134,7 @@ void draw_tri(t_triangle3 tri, char symbol)
     {
         for (int x = max2(pstart.x, 0); x < min2(pend.x, WIDTH); x++)
         {
-            for (int y = max2(funcs[0].a * x + funcs[0].b, 0);
+            for (int y = round_up(map_to_range(funcs[0].a * x + funcs[0].b, 0, HEIGHT - 1));
 				y < min2(min2(funcs[1].a * x + funcs[1].b, funcs[2].a * x + funcs[2].b), HEIGHT);
 				y++)
             {
@@ -143,7 +153,7 @@ void draw_tri(t_triangle3 tri, char symbol)
     {
         for (int x = max2(pstart.x, 0); x < min2(pend.x, WIDTH); x++)
         {
-            for (int y = min2(funcs[0].a * x + funcs[0].b, HEIGHT - 1);
+            for (int y = map_to_range(funcs[0].a * x + funcs[0].b, 0, HEIGHT - 1);
 				y >= max2(max2(funcs[1].a * x + funcs[1].b, funcs[2].a * x + funcs[2].b), 0);
 				y--)
 			{
@@ -199,8 +209,11 @@ void define_triangle(t_triangle3 *tri, t_vec3 *p1, t_vec3 *p2, t_vec3 *p3)
 
 void draw_shape(t_shape shape)
 {
-    for (int i = 0; i < shape.size; i++)
-        draw_tri(shape.tris[i], shape.texture[i]);
+    for (int i = 0; i < shape.t_size; i++)
+	{
+		if (i != 6)
+        	draw_tri(shape.tris[i], shape.texture[i]);
+	}
 }
 
 void add_vectors(t_vec3 *og, t_vec3 delta)
@@ -223,7 +236,7 @@ t_vec3 inv_vec(t_vec3 v)
 
 void move_shape(t_shape *shape, t_vec3 mvmt)
 {
-    for (int i = 0; i < shape->size; i++)
+    for (int i = 0; i < shape->p_size; i++)
     {
         add_vectors(shape->points + i, mvmt);
     }
@@ -250,7 +263,7 @@ void turn_shape(t_shape shape, float x, float y, float z)
     move_shape(&shape, inv_vec(og_center));
     //printf(" mov1 : p1 x: %f, y: %f, z: %f\n", shape.points[0].x, shape.points[0].y, shape.points[0].z);
     
-    for (int i = 0; i < shape.size; i++)
+    for (int i = 0; i < shape.p_size; i++)
     {
         rotate_point_x(shape.points + i, x);
         rotate_point_y(shape.points + i, y);
@@ -261,6 +274,13 @@ void turn_shape(t_shape shape, float x, float y, float z)
     //printf(" mov 2: p1 x: %f, y: %f, z: %f\n\n", shape.points[0].x, shape.points[0].y, shape.points[0].z);
 }
 
+void assign_vec(t_vec3 *vec, float x, float y, float z)
+{
+	vec->x = x;
+	vec->y = y;
+	vec->z = z;
+}
+
 int main(void)
 {
 	float alpha;
@@ -269,6 +289,7 @@ int main(void)
     fovtan = (get_cos(fov / 360 * PI, trig_table) / get_sin(fov / 360 * PI, trig_table));
 
 	/*
+	*/
     t_vec3 tetra_center;
     tetra_center.x = 0, tetra_center.y = 0, tetra_center.z = 0;
 
@@ -280,7 +301,8 @@ int main(void)
 
     t_shape tetrahedron;
 
-    tetrahedron.size = 4;
+    tetrahedron.t_size = 4;
+    tetrahedron.p_size = 4;
     tetrahedron.points = tetra_points;
     t_triangle3 tetra_tris[4];
     define_triangle(tetra_tris, tetra_points + 0, tetra_points + 1, tetra_points + 2);
@@ -289,8 +311,34 @@ int main(void)
     define_triangle(tetra_tris + 3, tetra_points + 1, tetra_points + 2, tetra_points + 3);
     tetrahedron.tris = tetra_tris;
     tetrahedron.center = tetra_center;
-    tetrahedron.texture = "#L/-";
+    tetrahedron.texture = "#a/-";
+	/*
+	t_vec3 hex_center;
+	assign_vec(&hex_center, 0, 0, 0);
+
+	t_vec3 hex_points[6];
+	assign_vec(hex_points, 0, -40, 0);
+	assign_vec(hex_points + 1, 34.64, -20, 0);
+	assign_vec(hex_points + 2, 34.64, 20, 0);
+	assign_vec(hex_points + 3, -34.64, -20, 0);
+	assign_vec(hex_points + 4, -34.64, 20, 0);
+	assign_vec(hex_points + 5, 0, 40, 0);
+
+	t_shape hexagon;
+	
+	hexagon.center = hex_center;
+	hexagon.p_size = 6;
+	hexagon.t_size = 4;
+	t_triangle3 hex_tris[4];
+	define_triangle(hex_tris, hex_points + 0, hex_points + 1, hex_points + 3);
+	define_triangle(hex_tris + 1, hex_points + 1, hex_points + 2, hex_points + 3);
+	define_triangle(hex_tris + 2, hex_points + 4, hex_points + 2, hex_points + 3);
+	define_triangle(hex_tris + 3, hex_points + 4, hex_points + 2, hex_points + 5);
+	hexagon.tris = hex_tris;
+	hexagon.points = hex_points;
+	hexagon.texture = "ABCD";
 	*/
+	/*
 	t_vec3 tetra_center;
     tetra_center.x = 0, tetra_center.y = 0, tetra_center.z = 0;
 
@@ -325,6 +373,7 @@ int main(void)
     tetrahedron.tris = tetra_tris;
     tetrahedron.center = tetra_center;
     tetrahedron.texture = "#L/-";
+	*/
 
     printf("\x1b[2J");
 
@@ -337,7 +386,7 @@ int main(void)
 
     move_shape(&tetrahedron, new_pos);
 
-    while (i < 10000)
+    while (i < 30000)
     {
         i += 1;
 
@@ -355,9 +404,9 @@ int main(void)
 		/*
 		*/
         
-        turn_shape(tetrahedron, 0.0005, 0.0008, 0);
-        alpha+=0.0001;
-        beta+=0.0001;
+        turn_shape(tetrahedron, -0.002, 0.002, 0);
+        alpha+=0.0005;
+        beta+=0.0005;
 
         //printf("\nz is: %f,  sin of z: %f, cos of z: %f\n", alpha, get_sin(alpha, trig_table), get_cos(alpha, trig_table));
     }
