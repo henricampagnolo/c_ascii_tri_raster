@@ -26,7 +26,7 @@ void usleep(__int64 usec)
 
 # define PI 3.14159265358979
 # define TRIG_PRECISION 50
-# define TABLE_SIZE 2048
+# define TABLE_SIZE 8192
 
 void create_sin_table(float *result);
 

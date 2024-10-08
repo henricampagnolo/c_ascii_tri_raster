@@ -1,7 +1,8 @@
 #include "tri_raster.h"
 
-#define WIDTH 80
-#define HEIGHT 40
+#define WIDTH 240
+#define HEIGHT 120 // this should always be half the width
+#define SPEED 40 // higher is slower, one is the fastest, you can also change turn_shape in main loop to make faster
 
 float A, B, C;
 
@@ -9,7 +10,7 @@ float zBuffer[WIDTH * HEIGHT];
 char buffer[WIDTH * HEIGHT];
 int backgroundASCIICode = '.';
 float trig_table[TABLE_SIZE + 1];
-float fov = 40;
+float fov = 28;
 float fovtan;
 
 // yes indeed
@@ -62,8 +63,8 @@ void get_slopes(float *h_slope, float *v_slope, t_vec3 p0, t_vec3 p1, t_vec3 p2)
     dz1 = p1.z - p0.z;
     dz2 = p2.z - p0.z;
 
-    *v_slope = (dz2 * dx1 - dz1 * dx2) / (dx1 * dy2 - dx2 * dy1);
-    *h_slope = (dz1 - dy1 * (*v_slope)) / dx1;  
+    *v_slope = (dz2 * dx1 - dz1 * dx2) / (dx1 * dy2 - dx2 * dy1 + 0.00001);
+    *h_slope = (dz1 - dy1 * (*v_slope)) / (dx1 + 0.00001);  
 }
 
 void get_funcs(t_linear funcs[3], t_triangle3 proj_tri)
@@ -82,7 +83,7 @@ void get_funcs(t_linear funcs[3], t_triangle3 proj_tri)
             p2 = proj_tri.points[(i + 2) % 3][0];
             p1 = proj_tri.points[i][0];
         }
-        funcs[i].a = (p2.y - p1.y) / ((p2.x - p1.x) + 0.0000001);
+        funcs[i].a = (p2.y - p1.y) / ((p2.x - p1.x) + 0.00001);
         funcs[i].b = p1.y - p1.x * funcs[i].a;
     }
 }
@@ -140,11 +141,13 @@ void draw_tri(t_triangle3 tri, char symbol)
             {
                 current_z = start_z + (x - pstart.x) * h_slope + (y - pstart.y) * v_slope;
                 //printf("x is: %d, y is: %d and current: %f and zbuf: %f\n", x, y, current_z, zBuffer[(HEIGHT - y) *  WIDTH + x]);
-                if (1 / current_z > (zBuffer[(HEIGHT - y) *  WIDTH + x] + 0.000001))
+                if (current_z < zBuffer[(HEIGHT - y) *  WIDTH + x])
                 {
                     //printf("printing :: x is: %d, y is: %d", x, y);
-                    zBuffer[(HEIGHT - y) *  WIDTH + x] = 1 / current_z;
+                    zBuffer[(HEIGHT - y) *  WIDTH + x] = current_z;
                     buffer[(HEIGHT - y) *  WIDTH + x] = symbol;
+					//buffer[(HEIGHT - y) *  WIDTH + x] = (char)(current_z - 135 + 30) * 10 + 34;
+					//symbol += 1;
                 }
             }
         }
@@ -159,11 +162,12 @@ void draw_tri(t_triangle3 tri, char symbol)
 			{
                 current_z = start_z + (x - pstart.x) * h_slope + (y - pstart.y) * v_slope;
                 //printf("x is: %d, y is: %d and current: %f and zbuf: %f\n", x, y, current_z, zBuffer[(HEIGHT - y) *  WIDTH + x]);
-                if (1 / current_z > (zBuffer[(HEIGHT - y) *  WIDTH + x] + 0.000001))
+                if (current_z < zBuffer[(HEIGHT - y) *  WIDTH + x])
                 {
                     //printf("printing :: x is: %d, y is: %d", x, y);
-                    zBuffer[(HEIGHT - y) *  WIDTH + x] = 1 / current_z;
-                    buffer[(HEIGHT - y) *  WIDTH + x] = symbol;
+                    zBuffer[(HEIGHT - y) *  WIDTH + x] = current_z;
+					buffer[(HEIGHT - y) *  WIDTH + x] = symbol;
+                    //buffer[(HEIGHT - y) *  WIDTH + x] = (char)(current_z - 135 + 30) * 10 + 34;
                 }
             }
         }
@@ -200,18 +204,29 @@ void rotate_point_z(t_vec3 *p_p, float rad)
     p_p->y = -sin * x + cos * y;
 }
 
-void define_triangle(t_triangle3 *tri, t_vec3 *p1, t_vec3 *p2, t_vec3 *p3)
+void define_triangle(t_triangle3 *tri, t_vec3 *points, int p1, int p2, int p3)
 {
-    tri->points[0] = p1;
-    tri->points[1] = p2;
-    tri->points[2] = p3;
+    tri->points[0] = points + p1;
+    tri->points[1] = points + p2;
+    tri->points[2] = points + p3;
 }
+
+void define_quad(t_triangle3 *tri1, t_triangle3 *tri2, t_vec3 *points, int p1, int p2, int p3, int p4)
+{
+    tri1->points[0] = points + p1;
+    tri1->points[1] = points + p2;
+    tri1->points[2] = points + p3;
+	tri2->points[0] = points + p2;
+    tri2->points[1] = points + p3;
+    tri2->points[2] = points + p4;
+}
+
 
 void draw_shape(t_shape shape)
 {
     for (int i = 0; i < shape.t_size; i++)
 	{
-		if (i != 6)
+		if (shape.texture[i] != '!')
         	draw_tri(shape.tris[i], shape.texture[i]);
 	}
 }
@@ -289,15 +304,14 @@ int main(void)
     fovtan = (get_cos(fov / 360 * PI, trig_table) / get_sin(fov / 360 * PI, trig_table));
 
 	/*
-	*/
     t_vec3 tetra_center;
     tetra_center.x = 0, tetra_center.y = 0, tetra_center.z = 0;
 
     t_vec3 tetra_points[4];
-    tetra_points[0].x = 0, tetra_points[0].y = 40, tetra_points[0].z = 0;
-    tetra_points[1].x = 32.66, tetra_points[1].y = -13.34, tetra_points[1].z = -18.86;
-    tetra_points[2].x = -32.66, tetra_points[2].y = -13.34, tetra_points[2].z = -18.86;
-    tetra_points[3].x = 0, tetra_points[3].y = -13.34, tetra_points[3].z = 37.71;
+	assign_vec(tetra_points + 0, 0, 40, 0);
+	assign_vec(tetra_points + 1, 32.66, -13.34, -18.86);
+	assign_vec(tetra_points + 2, -32.66, -13.34, -18.86);
+	assign_vec(tetra_points + 3, 0, -13.34, 37.71);
 
     t_shape tetrahedron;
 
@@ -305,13 +319,15 @@ int main(void)
     tetrahedron.p_size = 4;
     tetrahedron.points = tetra_points;
     t_triangle3 tetra_tris[4];
-    define_triangle(tetra_tris, tetra_points + 0, tetra_points + 1, tetra_points + 2);
-    define_triangle(tetra_tris + 1, tetra_points + 0, tetra_points + 1, tetra_points + 3);
-    define_triangle(tetra_tris + 2, tetra_points + 0, tetra_points + 2, tetra_points + 3);
-    define_triangle(tetra_tris + 3, tetra_points + 1, tetra_points + 2, tetra_points + 3);
+    define_triangle(tetra_tris, tetra_points, 0, 1, 2);
+    define_triangle(tetra_tris + 1, tetra_points, 0, 1, 3);
+    define_triangle(tetra_tris + 2, tetra_points, 0, 2, 3);
+    define_triangle(tetra_tris + 3, tetra_points, 1, 2, 3);
     tetrahedron.tris = tetra_tris;
     tetrahedron.center = tetra_center;
     tetrahedron.texture = "#a/-";
+	*/
+
 	/*
 	t_vec3 hex_center;
 	assign_vec(&hex_center, 0, 0, 0);
@@ -338,41 +354,124 @@ int main(void)
 	hexagon.points = hex_points;
 	hexagon.texture = "ABCD";
 	*/
+
+    t_shape shape4;
+
+	t_vec3 shape4_center;
+    shape4_center.x = 27.5, shape4_center.y = 20, shape4_center.z = 5;
+
+	shape4.p_size = 18 + 24;
+    t_vec3 shape4_points[shape4.p_size];
+    assign_vec(shape4_points + 0, 20, 0, 0);
+	assign_vec(shape4_points + 1, 30, 0, 0);
+	assign_vec(shape4_points + 2, 30, 20, 0);
+	assign_vec(shape4_points + 3, 20, 10, 0);
+	assign_vec(shape4_points + 4, 10, 20, 0);
+	assign_vec(shape4_points + 5, 0, 10, 0);
+	assign_vec(shape4_points + 6, 30, 40, 0);
+	assign_vec(shape4_points + 7, 20, 40, 0);
+	assign_vec(shape4_points + 8, 0, 20, 0);
+
+	assign_vec(shape4_points + 9, 20, 0, 10);
+	assign_vec(shape4_points + 10, 30, 0, 10);
+	assign_vec(shape4_points + 11, 30, 20, 10);
+	assign_vec(shape4_points + 12, 20, 10, 10);
+	assign_vec(shape4_points + 13, 10, 20, 10);
+	assign_vec(shape4_points + 14, 0, 10, 10);
+	assign_vec(shape4_points + 15, 30, 40, 10);
+	assign_vec(shape4_points + 16, 20, 40, 10);
+	assign_vec(shape4_points + 17, 0, 20, 10);
+
+
+	assign_vec(shape4_points + 0 + 18, 35, 30, 0);
+	assign_vec(shape4_points + 1 + 18, 35, 40, 0);
+	assign_vec(shape4_points + 2 + 18, 45, 40, 0);
+	assign_vec(shape4_points + 3 + 18, 55, 40, 0);
+	assign_vec(shape4_points + 4 + 18, 55, 30, 0);
+	assign_vec(shape4_points + 5 + 18, 45, 30, 0);
+	assign_vec(shape4_points + 6 + 18, 45, 20, 0);
+	assign_vec(shape4_points + 7 + 18, 35, 20, 0);
+	assign_vec(shape4_points + 8 + 18, 35, 10, 0);
+	assign_vec(shape4_points + 9 + 18, 45, 10, 0);
+	assign_vec(shape4_points + 10 + 18, 55, 10, 0);
+	assign_vec(shape4_points + 11 + 18, 55, 20, 0);
+
+	assign_vec(shape4_points + 0 + 18 + 12, 35, 30, 10);
+	assign_vec(shape4_points + 1 + 18 + 12, 35, 40, 10);
+	assign_vec(shape4_points + 2 + 18 + 12, 45, 40, 10);
+	assign_vec(shape4_points + 3 + 18 + 12, 55, 40, 10);
+	assign_vec(shape4_points + 4 + 18 + 12, 55, 30, 10);
+	assign_vec(shape4_points + 5 + 18 + 12, 45, 30, 10);
+	assign_vec(shape4_points + 6 + 18 + 12, 45, 20, 10);
+	assign_vec(shape4_points + 7 + 18 + 12, 35, 20, 10);
+	assign_vec(shape4_points + 8 + 18 + 12, 35, 10, 10);
+	assign_vec(shape4_points + 9 + 18 + 12, 45, 10, 10);
+	assign_vec(shape4_points + 10 + 18 + 12, 55, 10, 10);
+	assign_vec(shape4_points + 11 + 18 + 12, 55, 20, 10);
+
+    shape4.points = shape4_points;
+
+	shape4.t_size = 30 + 12 + 12 * 2;
+    t_triangle3 shape4_tris[shape4.t_size];
+    define_triangle(shape4_tris + 0, shape4_points, 0, 1, 2);
+    define_triangle(shape4_tris + 1, shape4_points, 0, 2, 3);
+	define_triangle(shape4_tris + 2, shape4_points, 2, 3, 4);
+	define_triangle(shape4_tris + 3, shape4_points, 3, 4, 5);
+	define_triangle(shape4_tris + 4, shape4_points, 5, 6, 7);
+	define_triangle(shape4_tris + 5, shape4_points, 5, 7, 8);
+
+	define_triangle(shape4_tris + 6, shape4_points, 0 + 9, 1 + 9, 2 + 9);
+    define_triangle(shape4_tris + 7, shape4_points, 0 + 9, 2 + 9, 3 + 9);
+	define_triangle(shape4_tris + 8, shape4_points, 2 + 9, 3 + 9, 4 + 9);
+	define_triangle(shape4_tris + 9, shape4_points, 3 + 9, 4 + 9, 5 + 9);
+	define_triangle(shape4_tris + 10, shape4_points, 5 + 9, 6 + 9, 7 + 9);
+	define_triangle(shape4_tris + 11, shape4_points, 5 + 9, 7 + 9, 8 + 9);
+	
+	define_quad(shape4_tris + 12, shape4_tris + 13, shape4_points, 0, 1, 0 + 9, 1 + 9);
+	define_quad(shape4_tris + 14, shape4_tris + 15, shape4_points, 1, 2, 1 + 9, 2 + 9);
+	define_quad(shape4_tris + 16, shape4_tris + 17, shape4_points, 2, 4, 2 + 9, 4 + 9);
+	define_quad(shape4_tris + 18, shape4_tris + 19, shape4_points, 4, 6, 4 + 9, 6 + 9);
+	define_quad(shape4_tris + 20, shape4_tris + 21, shape4_points, 6, 7, 6 + 9, 7 + 9);
+	define_quad(shape4_tris + 22, shape4_tris + 23, shape4_points, 7, 8, 7 + 9, 8 + 9);
+	define_quad(shape4_tris + 24, shape4_tris + 25, shape4_points, 8, 5, 8 + 9, 5 + 9);
+	define_quad(shape4_tris + 26, shape4_tris + 27, shape4_points, 5, 3, 5 + 9, 3 + 9);
+	define_quad(shape4_tris + 28, shape4_tris + 29, shape4_points, 3, 0, 3 + 9, 0 + 9);
+
+	define_triangle(shape4_tris + 0 + 30, shape4_points + 18, 0, 1, 2);
+    define_triangle(shape4_tris + 1 + 30, shape4_points + 18, 2, 3, 5);
+	define_triangle(shape4_tris + 2 + 30, shape4_points + 18, 3, 4, 7);
+	define_triangle(shape4_tris + 3 + 30, shape4_points + 18, 4, 7, 8);
+	define_triangle(shape4_tris + 4 + 30, shape4_points + 18, 6, 8, 9);
+	define_triangle(shape4_tris + 5 + 30, shape4_points + 18, 9, 10, 11);
+
+	define_triangle(shape4_tris + 0 + 36, shape4_points + 18 + 12, 0, 1, 2);
+    define_triangle(shape4_tris + 1 + 36, shape4_points + 18 + 12, 2, 3, 5);
+	define_triangle(shape4_tris + 2 + 36, shape4_points + 18 + 12, 3, 4, 7);
+	define_triangle(shape4_tris + 3 + 36, shape4_points + 18 + 12, 4, 7, 8);
+	define_triangle(shape4_tris + 4 + 36, shape4_points + 18 + 12, 6, 8, 9);
+	define_triangle(shape4_tris + 5 + 36, shape4_points + 18 + 12, 9, 10, 11);
+
+	define_quad(shape4_tris + 12 + 30, shape4_tris + 13 + 30, shape4_points + 18, 0 , 1 , 0  + 12, 1  + 12);
+	define_quad(shape4_tris + 14 + 30, shape4_tris + 15 + 30, shape4_points + 18, 1 , 3 , 1  + 12, 3  + 12);
+	define_quad(shape4_tris + 16 + 30, shape4_tris + 17 + 30, shape4_points + 18, 3 , 4 , 3  + 12, 4  + 12);
+	define_quad(shape4_tris + 18 + 30, shape4_tris + 19 + 30, shape4_points + 18, 4 , 6 , 4  + 12, 6  + 12);
+	define_quad(shape4_tris + 20 + 30, shape4_tris + 21 + 30, shape4_points + 18, 6 , 9 , 6  + 12, 9  + 12);
+	define_quad(shape4_tris + 22 + 30, shape4_tris + 23 + 30, shape4_points + 18, 9 , 11, 9  + 12, 11 + 12);
+	define_quad(shape4_tris + 24 + 30, shape4_tris + 25 + 30, shape4_points + 18, 11, 10, 11 + 12, 10 + 12);
+	define_quad(shape4_tris + 26 + 30, shape4_tris + 27 + 30, shape4_points + 18, 10, 8 , 10 + 12, 8  + 12);
+	define_quad(shape4_tris + 28 + 30, shape4_tris + 29 + 30, shape4_points + 18, 8 , 7 , 8  + 12, 7  + 12);
+	define_quad(shape4_tris + 30 + 30, shape4_tris + 31 + 30, shape4_points + 18, 7 , 5 , 7  + 12, 5  + 12);
+	define_quad(shape4_tris + 32 + 30, shape4_tris + 33 + 30, shape4_points + 18, 5 , 2 , 5  + 12, 2  + 12);
+	define_quad(shape4_tris + 34 + 30, shape4_tris + 35 + 30, shape4_points + 18, 2 , 0 , 2  + 12, 0  + 12);
+
+    shape4.tris = shape4_tris;
+    shape4.center = shape4_center;
+    //shape4.texture = "444444444444--||--\\\\--\\\\||--||222222222222||--||\\\\||\\\\||--||\\\\||\\\\";
+	//shape4.texture = "444444DDDDDD!!!!!!!!!!!!!!!!!!222222BBBBBB!!!!!!!!!!!!!!!!!!!!!!!!";
+	//shape4.texture = "!!!!!!!!!!!!--||--\\\\--\\\\||--||!!!!!!!!!!!!||--||\\\\||\\\\||--||\\\\||\\\\";
+	shape4.texture = "444444444444!!||!!\\\\!!\\\\||!!||222222222222||!!||\\\\||\\\\||!!||\\\\||\\\\";
+	//shape4.texture = "!!!444!!!---!!!!!!!!!!\\\\||!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!";
 	/*
-	t_vec3 tetra_center;
-    tetra_center.x = 0, tetra_center.y = 0, tetra_center.z = 0;
-
-    t_vec3 cube_points[8];
-    cube_points[0].x = 40, cube_points[0].y = 40, cube_points[0].z = 40;
-    cube_points[1].x = 40, cube_points[1].y = 40, cube_points[1].z = -40;
-    cube_points[2].x = 40, cube_points[2].y = -40, cube_points[2].z = 40;
-    cube_points[3].x = 40, cube_points[3].y = -40, cube_points[3].z = -40;
-	cube_points[4].x = -40, cube_points[4].y = 40, cube_points[4].z = 40;
-	cube_points[5].x = -40, cube_points[5].y = 40, cube_points[5].z = -40;
-	cube_points[6].x = -40, cube_points[6].y = -40, cube_points[6].z = 40;
-	cube_points[7].x = -40, cube_points[7].y = -40, cube_points[7].z = -40;
-
-    t_shape cube;
-
-    cube.size = 12;
-    cube.points = cube_points;
-    t_triangle3 cube_tris[12];
-    define_triangle(cube_tris, cube_points + 0, cube_points + 1, cube_points + 2);
-    define_triangle(cube_tris + 1, cube_points + 3, cube_points + 1, cube_points + 2);
-    define_triangle(cube_tris + 2, cube_points + 0, cube_points + 2, cube_points + 4);
-    define_triangle(cube_tris + 3, cube_points + 6, cube_points + 2, cube_points + 4);
-    define_triangle(cube_tris + 4, cube_points + 1, cube_points + 3, cube_points + 5);
-    define_triangle(cube_tris + 5, cube_points + 7, cube_points + 3, cube_points + 5);
-    define_triangle(cube_tris + 6, cube_points + 4, cube_points + 5, cube_points + 6);
-    define_triangle(cube_tris + 7, cube_points + 7, cube_points + 5, cube_points + 6);
-    define_triangle(cube_tris + 8, cube_points + 0, cube_points + 1, cube_points + 2);
-    define_triangle(cube_tris + 9, cube_points + 0, cube_points + 1, cube_points + 2);
-    define_triangle(cube_tris + 10, cube_points + 0, cube_points + 1, cube_points + 2);
-    define_triangle(cube_tris + 11, cube_points + 0, cube_points + 1, cube_points + 2);
-
-    tetrahedron.tris = tetra_tris;
-    tetrahedron.center = tetra_center;
-    tetrahedron.texture = "#L/-";
 	*/
 
     printf("\x1b[2J");
@@ -382,31 +481,36 @@ int main(void)
     int i = 0;
 
     t_vec3 new_pos;
-    new_pos.x = 0, new_pos.y = 0, new_pos.z = 130;
+    new_pos.x = -27.5, new_pos.y = -20, new_pos.z = 130;
 
-    move_shape(&tetrahedron, new_pos);
+    move_shape(&shape4, new_pos);
 
-    while (i < 30000)
+	turn_shape(shape4, 0, 0, 0.0008);
+
+    while (i > -1)
     {
         i += 1;
 
         memset(buffer, backgroundASCIICode, WIDTH * HEIGHT);
-        memset(zBuffer, 1024.0, WIDTH * HEIGHT * 4);
+        memset(zBuffer, 'a', WIDTH * HEIGHT * 4);
 
-        draw_shape(tetrahedron);
+        draw_shape(shape4);
 
-        printf("\x1b[H");
-        for (int k = 0; k < WIDTH * HEIGHT; k++) 
-        {
-            putchar(k % WIDTH ? buffer[k] : 10);
-			//putchar(k % WIDTH ? ' ' : '\t');
-        }
-		/*
-		*/
-        
-        turn_shape(tetrahedron, -0.002, 0.002, 0);
-        alpha+=0.0005;
-        beta+=0.0005;
+		if(i % SPEED == 0)
+		{
+			printf("\x1b[H");
+			for (int k = 0; k < WIDTH * HEIGHT; k++) 
+			{
+				putchar(k % WIDTH ? buffer[k] : 10);
+				//putchar(k % WIDTH ? ' ' : '\t');
+			}
+			/*
+			*/
+			
+			turn_shape(shape4, 0, 0.008, 0);
+			alpha+=0.0005;
+			beta+=0.0005;
+		}
 
         //printf("\nz is: %f,  sin of z: %f, cos of z: %f\n", alpha, get_sin(alpha, trig_table), get_cos(alpha, trig_table));
     }
